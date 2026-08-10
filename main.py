@@ -4,4 +4,12 @@ app = FastAPI(title="Basic FastAPI Server")
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello World. The environment is successfully validated and running."}
+    return {
+        "name": "Task API",
+        "version": "1.0",
+        "endpoints": ["/tasks"]
+    }
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}    
