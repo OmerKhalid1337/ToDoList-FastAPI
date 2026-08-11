@@ -1,3 +1,4 @@
+from fastapi import Response
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -73,3 +74,28 @@ def create_task(task: TaskCreate):
     tasks.append(new_task)
 
     return new_task
+
+@app.put("/tasks/{id}") 
+def update_task(id: int, task: TaskCreate): 
+    for existing_task in tasks: 
+        if existing_task["id"] == id: 
+            existing_task["title"] = task.title 
+            existing_task["done"] = task.done 
+            return existing_task 
+            
+    raise HTTPException( 
+        status_code=404, 
+        detail=f"Task {id} not found" 
+        ) 
+
+@app.delete("/tasks/{id}", status_code=204) 
+def delete_task(id: int): 
+    for task in tasks: 
+        if task["id"] == id: 
+            tasks.remove(task) 
+            return Response(status_code=204) 
+        
+    raise HTTPException( 
+        status_code=404, 
+        detail=f"Task {id} not found" 
+        )
