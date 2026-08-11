@@ -1,7 +1,13 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 
 app = FastAPI(title="Basic FastAPI Server")
+
+
+class TaskCreate(BaseModel):
+    title: str
+    done: bool
 
 
 tasks = [
@@ -52,3 +58,18 @@ def get_task(id: int):
         status_code=404,
         detail=f"Task {id} not found"
     )
+
+
+@app.post("/tasks", status_code=201)
+def create_task(task: TaskCreate):
+    new_id = max((int(existing_task["id"]) for existing_task in tasks), default=0) + 1
+
+    new_task = {
+        "id": new_id,
+        "title": task.title,
+        "done": task.done
+    }
+
+    tasks.append(new_task)
+
+    return new_task
