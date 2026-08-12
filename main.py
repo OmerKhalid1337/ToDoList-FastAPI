@@ -1,7 +1,9 @@
+import sqlite3
 from fastapi import Response
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+DATABASE = "tasks.db"
 
 app = FastAPI(title="Basic FastAPI Server")
 
@@ -11,24 +13,37 @@ class TaskCreate(BaseModel):
     done: bool
 
 
-tasks = [
-    {
-        "id": 1,
-        "title": "Learn FastAPI",
-        "done": False
-    },
-    {
-        "id": 2,
-        "title": "Build Task API",
-        "done": False
-    },
-    {
-        "id": 3,
-        "title": "Test Task API",
-        "done": True
-    }
-]
+def init_database():
+    connection = sqlite3.connect(DATABASE)
 
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY,
+            title TEXT NOT NULL,
+            done BOOLEAN NOT NULL
+        )
+    """)
+
+    connection.commit()
+
+    existing_tasks = connection.execute(
+        "SELECT COUNT(*) FROM tasks"
+    ).fetchone()[0]
+
+    if existing_tasks == 0:
+        connection.executemany(
+            "INSERT INTO tasks (id, title, done) VALUES (?, ?, ?)",
+            [
+                (1, "Learn FastAPI", False),
+                (2, "Build Task API", False),
+                (3, "Test Task API", True)
+            ]
+        )
+        connection.commit()
+
+    connection.close()
+
+init_database()
 
 @app.get("/", description="Get basic information about the Task API.")
 def read_root():
@@ -46,19 +61,46 @@ def health_check():
 
 @app.get("/tasks", description="Get all tasks.")
 def get_tasks():
-    return tasks
+    connection = sqlite3.connect(DATABASE)
+
+    rows = connection.execute(
+        "SELECT id, title, done FROM tasks"
+    ).fetchall()
+
+    connection.close()
+
+    return [
+        {
+            "id": row[0],
+            "title": row[1],
+            "done": bool(row[2])
+        }
+        for row in rows
+    ]
 
 
 @app.get("/tasks/{id}", description="Get a single task by ID.")
 def get_task(id: int):
-    for task in tasks:
-        if task["id"] == id:
-            return task
+    connection = sqlite3.connect(DATABASE)
 
-    raise HTTPException(
-        status_code=404,
-        detail=f"Task {id} not found"
-    )
+    row = connection.execute(
+        "SELECT id, title, done FROM tasks WHERE id = ?",
+        (id,)
+    ).fetchone()
+
+    connection.close()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task {id} not found"
+        )
+
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": bool(row[2])
+    }
 
 
 @app.post("/tasks", status_code=201, description="Create a new task.")
