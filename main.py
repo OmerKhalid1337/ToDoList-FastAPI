@@ -124,27 +124,55 @@ def create_task(task: TaskCreate):
         "done": task.done
     }
 
-@app.put("/tasks/{id}", description="Update an existing task by ID.") 
-def update_task(id: int, task: TaskCreate): 
-    for existing_task in tasks: 
-        if existing_task["id"] == id: 
-            existing_task["title"] = task.title 
-            existing_task["done"] = task.done 
-            return existing_task 
-            
-    raise HTTPException( 
-        status_code=404, 
-        detail=f"Task {id} not found" 
-        ) 
+@app.put("/tasks/{id}", description="Update an existing task by ID.")
+def update_task(id: int, task: TaskCreate):
+    connection = sqlite3.connect(DATABASE)
 
-@app.delete("/tasks/{id}", status_code=204, description="Delete a task by ID.") 
-def delete_task(id: int): 
-    for task in tasks: 
-        if task["id"] == id: 
-            tasks.remove(task) 
-            return Response(status_code=204) 
-        
-    raise HTTPException( 
-        status_code=404, 
-        detail=f"Task {id} not found" 
+    cursor = connection.execute(
+        "UPDATE tasks SET title = ?, done = ? WHERE id = ?",
+        (task.title, task.done, id)
+    )
+
+    connection.commit()
+
+    if cursor.rowcount == 0:
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task {id} not found"
         )
+
+    row = connection.execute(
+        "SELECT id, title, done FROM tasks WHERE id = ?",
+        (id,)
+    ).fetchone()
+
+    connection.close()
+
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": bool(row[2])
+    }
+
+@app.delete("/tasks/{id}", status_code=204, description="Delete a task by ID.")
+def delete_task(id: int):
+    connection = sqlite3.connect(DATABASE)
+
+    cursor = connection.execute(
+        "DELETE FROM tasks WHERE id = ?",
+        (id,)
+    )
+
+    connection.commit()
+
+    if cursor.rowcount == 0:
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task {id} not found"
+        )
+
+    connection.close()
+
+    return Response(status_code=204)
